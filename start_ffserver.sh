@@ -8,6 +8,8 @@ SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
 RTSP_PORT=5454
 # 自动获取服务器内网IP（优先取eth0/ens开头的网卡IP，也可手动指定）
 SERVER_IP=$(ip addr | grep -E 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | grep -v '::1' | awk '{print $2}' | cut -d '/' -f1 | grep -E '172|192|10' | head -n 1)
+# RTSP地址输出文件路径（新增配置）
+RTSP_OUTPUT_FILE="${SCRIPT_DIR}/rtsp_addresses.txt"
 
 # 如果自动获取IP失败，手动指定（可取消注释并修改）
 # SERVER_IP="172.20.26.189"
@@ -93,6 +95,23 @@ start_ffserver() {
     else
         echo "❌ ffserver启动失败！请查看日志：$NOHUP_LOG"
         exit 1
+    fi
+}
+
+# 写入RTSP地址到文件（新增函数）
+write_rtsp_to_file() {
+    echo -e "\n📝 正在将RTSP地址写入文件：$RTSP_OUTPUT_FILE"
+    # 先清空文件（避免旧内容残留）
+    > "$RTSP_OUTPUT_FILE"
+    # 遍历RTSP地址列表，逐行写入文件
+    for addr in "${rtsp_addresses[@]}"; do
+        echo "$addr" >> "$RTSP_OUTPUT_FILE"
+    done
+    # 检查写入是否成功
+    if [ -f "$RTSP_OUTPUT_FILE" ] && [ -s "$RTSP_OUTPUT_FILE" ]; then
+        echo "✅ RTSP地址已成功写入文件！"
+    else
+        echo "⚠️  警告：RTSP地址文件写入失败或文件为空！"
     fi
 }
 
@@ -191,7 +210,7 @@ echo "🔧 使用的ffserver路径：${FFSERVER_BIN}"
 echo "📊 共生成 $file_count 个视频流配置"
 echo "======================================"
 
-# 输出RTSP访问地址
+# 输出RTSP访问地址到控制台
 echo -e "\n📡 以下是可直接访问的RTSP地址："
 echo "--------------------------------------"
 for addr in "${rtsp_addresses[@]}"; do
@@ -199,7 +218,11 @@ for addr in "${rtsp_addresses[@]}"; do
 done
 echo "--------------------------------------"
 
+# 调用函数将RTSP地址写入文件（新增逻辑）
+write_rtsp_to_file
+
 echo -e "\n💡 提示：可使用VLC/ffplay打开上述RTSP地址播放视频"
+echo "💡 RTSP地址文件路径：$RTSP_OUTPUT_FILE"  # 新增提示
 echo "💡 停止ffserver命令：kill -9 $NEW_FF_PID"
 echo "💡 查看日志命令：tail -f $NOHUP_LOG"
 echo "💡 手动启动命令：nohup ${FFSERVER_BIN} -f $OUTPUT_FILE > $NOHUP_LOG 2>&1 &"
